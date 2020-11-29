@@ -13,23 +13,10 @@ def csv_read(file_path):
     return csv_data
 
 
-def color_draw(y_record, func_record, function):
-
-    print(func_record)
-    for i in range(len(y_record)):
-        temp_data = np.arange(y_record[i][0], y_record[i][1], 0.001)
-        print(func_record[i], function[func_record[i][0]](y_record[i]), function[func_record[i][1]](y_record[i]), y_record[i])
-        plt.plot(function[func_record[i][0]](temp_data), temp_data)
-        plt.plot(function[func_record[i][1]](temp_data), temp_data)
-    plt.show()
 
 
-def devision(data):
-    # 2*n to n*2
-    data2 = data.transpose()
 
-    # 求y轴上的极值
-    min_y = np.argmin(data2[1])
+def devision(data, min_y):
 
     # 以最小值为起点重排序数据集
     new_data = np.vstack((data[min_y:], data[:min_y]))
@@ -59,7 +46,7 @@ def devision(data):
     function = []
     for i in range(len(ex_value)-1):
         temp_data = np.transpose(new_data[ex_value[i]:ex_value[i+1]])
-        function.append(interpolate.interp1d(temp_data[1], temp_data[0], kind="cubic", fill_value='extrapolate'))
+        function.append(interpolate.interp1d(temp_data[1], temp_data[0], kind=1, fill_value='extrapolate'))
 
     # 做区域的划分工作
     record = []
@@ -111,11 +98,84 @@ def devision(data):
     return y_record, func_record, function
 
 
-def main():
-    data = csv_read('Attachment 1/graph1.csv').to_numpy()
-    y_record, func_record, function = devision(data)
+def color_draw(y_record, func_record, function, color_num):
 
-    color_draw(y_record, func_record, function)
+    for i in range(len(y_record)):
+
+        temp_data = np.arange(y_record[i][0], y_record[i][1], 0.001)
+        # print(func_record[i], function[func_record[i][0]](y_record[i]), function[func_record[i][1]](y_record[i]), y_record[i])
+        plt.plot(function[func_record[i][0]](temp_data), temp_data, color[color_num[str(func_record[i])]])
+        plt.plot(function[func_record[i][1]](temp_data), temp_data, color[color_num[str(func_record[i])]])
+    plt.show()
+
+
+def line_connection(y_record, func_record, function, range_y, color_num):
+    interval = 0.1
+    x_set = np.arange(range_y[0], range_y[1], interval)
+    new_y_record = y_record
+    new_func_record = func_record
+
+    for i in range(len(func_record)):
+        for j in range(i+1, len(func_record)):
+            if new_y_record[j][0] < new_y_record[i][0] or new_y_record[j][0] == new_y_record[i][0] \
+                    and new_y_record[j][1] < new_y_record[i][1]:
+                temp = new_y_record[i]
+                new_y_record[i] = new_y_record[j]
+                new_y_record[j] = temp
+                temp = new_func_record[i]
+                new_func_record[i] = new_func_record[j]
+                new_func_record[j] = temp
+
+    scan_list = []
+    roof_iter = 0
+    total = 0
+    num = 0
+    # plt.figure(figsize=(20, 20))
+    for i in x_set:
+        while roof_iter < len(new_y_record) and new_y_record[roof_iter][0] <= i:
+            scan_list.append(roof_iter)
+            roof_iter += 1
+        for j in range(len(scan_list))[::-1]:
+            if new_y_record[scan_list[j]][1] < i:
+                scan_list.pop(j)
+        print(i)
+        for x in scan_list:
+            print(new_func_record[x], end=' ')
+        print('')
+        for j in range(len(scan_list)):
+            if abs(function[new_func_record[scan_list[j]][1]](i) - function[new_func_record[scan_list[j]][0]](i)) > 2*interval:
+                num += 1
+                total += abs(function[new_func_record[scan_list[j]][1]](i) - function[new_func_record[scan_list[j]][0]](i)) - 2*interval
+                if function[new_func_record[scan_list[j]][1]](i) < - 30:
+                    print(function[new_func_record[scan_list[j]][1]](i), new_func_record[scan_list[j]])
+                    print(new_y_record[scan_list[j]], i, "!!!!!!!!!!!!!!!")
+                plt.plot([min(function[new_func_record[scan_list[j]][0]](i),
+                              function[new_func_record[scan_list[j]][1]](i)) + interval,
+                          max(function[new_func_record[scan_list[j]][0]](i),
+                              function[new_func_record[scan_list[j]][1]](i)) - interval],
+                         [i, i], color=color[color_num[str(new_func_record[scan_list[j]])]], linewidth=1)
+    color_draw(y_record, func_record, function, color_num)
+    return total, num
+
+
+def main():
+    plt.figure(figsize=[8, 5])
+    data = csv_read('Attachment 1/graph1.csv').to_numpy()
+
+    # 2*n to n*2
+
+    # 求y轴上的极值
+    range_y = [data[np.argmin(data.transpose()[1])][1], data[np.argmax(data.transpose()[1])][1]]
+    # range_x = [data[np.argmin(data.transpose()[0])][0], data[np.argmax(data.transpose()[0])][0]]
+    y_record, func_record, function = devision(data, np.argmin(data.transpose()[1]))
+    color_num = {}
+    for i in range(len(func_record)):
+        color_num[str(func_record[i])] = i
+
+    # color_draw(y_record, func_record, function)
+
+    total, num = line_connection(y_record, func_record, function, range_y, color_num)
+    print(total, num)
 
 
 if __name__ == '__main__':
